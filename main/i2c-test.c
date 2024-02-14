@@ -18,14 +18,17 @@
 #define I2C_DEVICE	  0x68 // DS3231 RTC Clock addr
 #define I2C_DEVICE_NBYTES 12   // Number of bytes to read
 
+#define I2C_USE_CALLBACK
+
 TaskHandle_t i2c_task_handle;
 i2c_master_bus_handle_t i2c_bus_handle;
 
 volatile uint8_t i2c_data[I2C_DEVICE_NBYTES] = {0};
 
-volatile i2c_master_event_t i2c_event, last_i2c_event;
 volatile int i2c_completion_counter = 0;
 
+#ifdef I2C_USE_CALLBACK
+volatile i2c_master_event_t i2c_event, last_i2c_event;
 bool esp32_i2c_dev_callback(i2c_master_dev_handle_t i2c_dev, const i2c_master_event_data_t *evt_data, void *arg)
 {
 	i2c_event = evt_data->event;
@@ -34,6 +37,9 @@ bool esp32_i2c_dev_callback(i2c_master_dev_handle_t i2c_dev, const i2c_master_ev
 
 	return true;
 }
+#else
+volatile esp_err_t i2c_event, last_i2c_event;
+#endif
 
 void i2c_task(void *p)
 {
@@ -47,33 +53,37 @@ void i2c_task(void *p)
 
 	ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_bus_handle, &dev_cfg, &dev_handle) != ESP_OK);
 
+#ifdef I2C_USE_CALLBACK
 	// register callback
 	static i2c_master_event_callbacks_t cbs;
 	cbs.on_trans_done = esp32_i2c_dev_callback;
 
 	ESP_ERROR_CHECK(i2c_master_register_event_callbacks(dev_handle, &cbs, NULL) != ESP_OK);
+#endif
 
 	while (1)
 	{
 		uint8_t target = 0;
-		int i, n_bytes = I2C_DEVICE_NBYTES;
+		int n_bytes = I2C_DEVICE_NBYTES;
 
 		i2c_event = -1;
 
 		esp_err_t e = i2c_master_transmit_receive(dev_handle, (void *) &target, 1,
-			i2c_data, n_bytes, I2C_TIMEOUT_MS);
+			(uint8_t*)i2c_data, n_bytes, I2C_TIMEOUT_MS);
 
 		ESP_ERROR_CHECK(e);
 
+#ifdef I2C_USE_CALLBACK
 		while (i2c_event == -1)
 		{
 			vTaskSuspend(NULL);
 		}
 		last_i2c_event = i2c_event;
+#else
+		last_i2c_event = e;
+		vTaskDelay(1);
+#endif
 		i2c_completion_counter++;
-
-
-		//sleep(1);
 
 	}
 }
@@ -86,9 +96,11 @@ void initI2C()
 		.i2c_port = -1,
 		.scl_io_num = I2C_SCL,
 		.sda_io_num = I2C_SDA,
-		.trans_queue_depth = 128,
 		.glitch_ignore_cnt = 7,
 		.flags.enable_internal_pullup = true,
+#ifdef I2C_USE_CALLBACK
+		.trans_queue_depth = 128,
+#endif
 	};
 
 	ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &i2c_bus_handle));
