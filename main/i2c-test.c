@@ -27,8 +27,18 @@ volatile uint8_t i2c_data[I2C_DEVICE_NBYTES] = {0};
 
 volatile int i2c_completion_counter = 0;
 
+volatile i2c_master_event_t last_i2c_event = 0;
+volatile i2c_master_event_t i2c_event = 0;
+
+volatile esp_err_t          i2c_err = 0;
+
+char *i2c_events[] = {
+	[I2C_EVENT_ALIVE] = "I2C_EVENT_ALIVE",
+	[I2C_EVENT_DONE] = "I2C_EVENT_DONE",
+	[I2C_EVENT_NACK] = "I2C_EVENT_NACK",
+};
+
 #ifdef I2C_USE_CALLBACK
-volatile i2c_master_event_t i2c_event, last_i2c_event;
 bool esp32_i2c_dev_callback(i2c_master_dev_handle_t i2c_dev, const i2c_master_event_data_t *evt_data, void *arg)
 {
 	i2c_event = evt_data->event;
@@ -38,7 +48,6 @@ bool esp32_i2c_dev_callback(i2c_master_dev_handle_t i2c_dev, const i2c_master_ev
 	return true;
 }
 #else
-volatile esp_err_t i2c_event, last_i2c_event;
 #endif
 
 void i2c_task(void *p)
@@ -68,10 +77,10 @@ void i2c_task(void *p)
 
 		i2c_event = -1;
 
-		esp_err_t e = i2c_master_transmit_receive(dev_handle, (void *) &target, 1,
+		i2c_err = i2c_master_transmit_receive(dev_handle, (void *) &target, 1,
 			(uint8_t*)i2c_data, n_bytes, I2C_TIMEOUT_MS);
 
-		ESP_ERROR_CHECK(e);
+		ESP_ERROR_CHECK(i2c_err);
 
 #ifdef I2C_USE_CALLBACK
 		while (i2c_event == -1)
@@ -80,7 +89,6 @@ void i2c_task(void *p)
 		}
 		last_i2c_event = i2c_event;
 #else
-		last_i2c_event = e;
 		vTaskDelay(1);
 #endif
 		i2c_completion_counter++;
@@ -151,8 +159,8 @@ void app_main(void)
 		print_stats();
 		for (int i = 0; i < I2C_DEVICE_NBYTES; i++)
 			printf("%d. %02X\r\n", i, i2c_data[i]);
-		printf("meas/sec=%d last_i2c_event=%d\r\n",
-			i2c_completion_counter, last_i2c_event);
+		printf("meas/sec=%d, last_i2c_event=%d (%s), i2c_err=%d\r\n",
+			i2c_completion_counter, last_i2c_event, i2c_events[last_i2c_event], i2c_err);
 		i2c_completion_counter = 0;
 
 		vTaskDelayUntil( &lastwake, 1000 / portTICK_PERIOD_MS);
