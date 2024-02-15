@@ -131,6 +131,9 @@ void print_stats()
 		return;
 	}
 
+	printf("\r\n=== MALLOC_CAP_8BIT\r\n");
+	heap_caps_print_heap_info(MALLOC_CAP_8BIT);
+
 	printf("\r\n=== TASK STATS\r\n");
 	printf("name\t\trun ctr\tavg %%cpu\r\n");
 	vTaskGetRunTimeStats(stats);
