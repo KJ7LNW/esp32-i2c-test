@@ -74,7 +74,7 @@ i2c_master_bus_handle_t i2c_bus_handle;
 // Read data buffer
 volatile uint8_t i2c_data[I2C_DEVICE_NBYTES] = {0};
 
-// Counter for meas/sec stats printed each second
+// Counter for sample/sec stats printed each second
 volatile int i2c_completion_counter = 0;
 
 volatile i2c_master_event_t last_i2c_event = 0;
@@ -149,7 +149,7 @@ void i2c_task(void *p)
 		}
 		last_i2c_event = i2c_event;
 #else
-		// if running sync, just delay a tick:
+		// if running sync, just delay a tick to avoid a watchdog trigger:
 		vTaskDelay(1);
 #endif
 		i2c_completion_counter++;
@@ -208,7 +208,7 @@ void print_stats()
 	vTaskList(stats);
 	printf(stats);
 	printf("text length=%d\r\n", strlen(stats));
-	printf("Tasks are reported as blocked (B), ready (R), deleted (D) or suspended (S).\r\n");
+	printf("Tasks are reported as blocked (B), ready (R), deleted (D) or suspended (S).\r\n\n");
 
 	free(stats);
 #endif
@@ -224,7 +224,7 @@ void app_main(void)
 		print_stats();
 		for (int i = 0; i < I2C_DEVICE_NBYTES; i++)
 			printf("%d. %02X\r\n", i, i2c_data[i]);
-		printf("meas/sec=%d, last_i2c_event=%d (%s), i2c_err=%d\r\n",
+		printf("sample/sec=%d, last_i2c_event=%d (%s), i2c_err=%d\r\n\n",
 			i2c_completion_counter, last_i2c_event, i2c_events[last_i2c_event], i2c_err);
 		i2c_completion_counter = 0;
 
