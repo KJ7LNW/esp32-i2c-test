@@ -57,7 +57,7 @@
 // Set your SDA, SCL pins, and clock speed:
 #define I2C_SCL 11
 #define I2C_SDA 10
-#define I2C_CLOCK_HZ 100000 // 100kHz
+#define I2C_CLOCK_HZ 400000 // 400kHz
 
 // Set a device
 #define I2C_DEVICE	  0x68 // DS3231 RTC Clock addr
@@ -149,7 +149,9 @@ void i2c_task(void *p)
 		}
 		last_i2c_event = i2c_event;
 #else
-		// if running sync, just delay a tick to avoid a watchdog trigger:
+		// if running sync, just delay a tick to avoid a watchdog trigger.
+		// Comment the delay below if you are testing this PR:
+		//   https://github.com/espressif/esp-idf/pull/13322
 		vTaskDelay(1);
 #endif
 		i2c_completion_counter++;
